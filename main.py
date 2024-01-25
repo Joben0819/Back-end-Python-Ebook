@@ -53,8 +53,6 @@ app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
-    "http://localhost",
-    "http://localhost:8080",  # Add the actual origin of your web application
     "http://localhost:3000",  # Add other origins as needed
     # Add the production domain when deploying
 ]
@@ -63,7 +61,7 @@ client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?
 db = client["Users"] 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins="http://localhost:3000", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
