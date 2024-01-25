@@ -205,13 +205,6 @@ async def get_data():
 
 @app.post("/Added_books/")
 async def get_data(data: AddbookData):
-    try:
-        # Validate the input data
-        data = AddbookData(**data.dict())
-    except ValidationError as e:
-        # Handle validation error
-        raise HTTPException(status_code=422, detail=str(e))
-
     collection = db["Addbook"]
     name = data.name
     if name is None :
