@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from pathlib import Path
+from pydantic import ValidationError
 import os
 import io
 import random
@@ -51,11 +52,18 @@ app = FastAPI()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+origins = [
+    "http://localhost",
+    "http://localhost:8080",  # Add the actual origin of your web application
+    "http://localhost:3000",  # Add other origins as needed
+    # Add the production domain when deploying
+]
+
 client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?retryWrites=true&w=majority")
 db = client["Users"] 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -199,6 +207,13 @@ async def get_data():
 
 @app.post("/Added_books/")
 async def get_data(data: AddbookData):
+    try:
+        # Validate the input data
+        data = AddbookData(**data.dict())
+    except ValidationError as e:
+        # Handle validation error
+        raise HTTPException(status_code=422, detail=str(e))
+
     collection = db["Addbook"]
     name = data.name
     if name is None :
