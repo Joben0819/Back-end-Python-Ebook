@@ -1,5 +1,5 @@
 # import sys
-from fastapi import Depends, FastAPI, File, UploadFile, Form, HTTPException, Depends
+from fastapi import  FastAPI, File, UploadFile, Form, HTTPException, Depends, Cookie,Header
 from pymongo import MongoClient
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -16,10 +16,11 @@ from bson import ObjectId
 
 Port = 8000
 Domain = 'http://localhost:8000'
-SECRET_KEY = "4"
+SECRET_KEY = "748"
 
 def create_token(data: dict, secret:str, expires_delta: int):
     to_encode = data.copy()
+    print(secret,"here")
     encoded_jwt = jwt.encode(to_encode, secret, algorithm="HS256")
     return encoded_jwt
 
@@ -28,14 +29,14 @@ def decode_token(token: str, secret:str):
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload
     except jwt.ExpiredSignatureError:
-        return {"error": "Token has expired"}
+        return {"key": "Token has expired"}
     except jwt.DecodeError:
-        return {"error": "Invalid token"}
+        return {"key": "Invalid"}
 
-user_data = {"sub": "Joben"}
-token = create_token(user_data, secret="3", expires_delta=3600)  
-decoded_token = decode_token(token, secret="3")
-# print(decoded_token, 'ss')
+user_data = "true"
+# token = create_token({"key": user_data}, SECRET_KEY, expires_delta=3600)  
+# decoded_token = decode_token(token, SECRET_KEY)
+# print(decoded_token,token, 'ss')
 
 def print_and_increment():
     if not hasattr(print_and_increment, 'counter'):
@@ -61,7 +62,7 @@ client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?
 db = client["Users"] 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins="http://localhost:3000", 
+    allow_origins="http://localhost:3001", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -138,21 +139,33 @@ class AddbookData(BaseModel):
     name: str
     id: int
     
-@app.post("/register/")
+    
+@app.post("/AccountInfo/")
+async def get_data(token: str = Header(None), ticket: str = Header(None)):
+    collection = db["Users"]
+    if ticket and token :
+        data2 = list(collection.find({"id": int(ticket) }))
+        for item in data2:
+            item["_id"] = str(item["_id"]) 
+        decode_Ticket = decode_token(str(token), data2[0]["Key"])
+        if decode_Ticket["key"] != "Invalid":
+            user_response = {key: value for key, value in data2[0].items() if key != "Key" and key != "password" }
+            return user_response
+        else:
+            raise HTTPException(status_code=404, detail={"response" :"Token Not Found", "status": 404})
+    else:
+        raise HTTPException(status_code=404, detail={"response" :"Token Not Found", "status": 404}) 
+    
+    
+@app.post("/register")
 async def create_item(data: Register):
-    key = f'{print_and_increment()}'
     name = data.name
-    password = data.password
+    password = data.password  
     collection = db.get_collection("Users")
     data2 = list(collection.find({}))
     data3 = list(collection.find({ "name": name, "password": password}))
-    
-    for item in data2:
-        item["_id"] = str(item["_id"])  
-        
     for item in data3:
         item["_id"] = str(item["_id"]) 
-        
     if(name == "" or password == "" ):
         error_message = "null"
         return JSONResponse(content={"message": error_message}, status_code=200)
@@ -160,29 +173,41 @@ async def create_item(data: Register):
     elif data3:
         return JSONResponse(content={"message": "null"}, status_code=200)
     
-    elif( data3 == []):
+    elif not data3 :
+        random_Number = str(random.randint(1,1000))
         length = len(data2)
-        collection.insert_one({"name": name , "password": password , "id": data2[length -1 ].get("id") + 1})
-        data4 = list(collection.find({ "name": name, "password": password}))
-        for item in data4:
-            item["_id"] = str(item["_id"])  
-        return data4
+        token = create_token({"key": name}, random_Number, expires_delta=3600)  
+        user_Data = {"name": name , "password": password , "id": data2[length -1 ].get("id") + 1, "token" : token, "Key": random_Number}
+        user_response = {key: value for key, value in user_Data.items() if key != "token" and key != "password" }
+        collection.insert_one(user_Data) 
+        response = JSONResponse(content=user_response, status_code=200)
+        # response.set_cookie(key="my_token", value=random_Number, max_age=3600, httponly=True, secure=True, samesite="Strict")
+        return response
   
 @app.post("/login")
-async def create_item(data: Login):
+async def create_item( data: Login,  my_token: str = Cookie(None), ticket: str = Header(None)):
     collection = db["Users"]
     password = data.password
     name = data.name
     data2 = list(collection.find({"name": name, "password": password}))
-    
-    if data2 == []:
-        return JSONResponse(status_code=200,content={"detail": "Not existed"})
     for item in data2:
         item["_id"] = str(item["_id"])  
-    return data2[0]
-
+    if not data2 :
+        return JSONResponse(status_code=200,content={"detail": "Not existed"})
+    else:
+        random_Number = str(random.randint(1,1000))
+        token = create_token({"key": name}, random_Number, expires_delta=3600)
+        collection.update_one({"name": name},
+        {"$set":{"token": token, "Key": random_Number }})
+        data3 = list(collection.find({"name": name, "password": password}))
+        for item in data3:
+            item["_id"] = str(item["_id"])  
+        user_Data = data3[0]
+        user_response = {key: value for key, value in user_Data.items() if key != "Key" and key != "password" }
+        # response = JSONResponse(content=user_response, status_code=200)
+        return user_response
 @app.get("/get_data/")
-async def get_data():
+async def get_data( ):
     collection = db["Ebooks"]
     data = list(collection.find({}))
     
@@ -200,7 +225,7 @@ async def get_data():
     data = list(collection.find({}))
     data1 = len(data)
     for item in data:
-        item["_id"] = str(item["_id"])  
+        item["_id"] = str(item["_id"]) 
     return data[data1 - 1]
 
 @app.post("/Added_books/")
