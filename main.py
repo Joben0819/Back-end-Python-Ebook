@@ -141,20 +141,20 @@ class AddbookData(BaseModel):
     
     
 @app.post("/AccountInfo/")
-async def get_data(token: str = Header(None), ticket: str = Header(None)):
+async def get_data(token: str = Header(None), id: str = Header(None)):
     collection = db["Users"]
-    if ticket and token :
-        data2 = list(collection.find({"id": int(ticket) }))
+    if id and token :
+        data2 = list(collection.find({"id": int(id) }))
         for item in data2:
             item["_id"] = str(item["_id"]) 
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket["key"] != "Invalid":
-            user_response = {key: value for key, value in data2[0].items() if key != "Key" and key != "password" }
+            user_response = {key: value for key, value in data2[0].items() if key != "Key" and key != "password" and key != "token" }
             return user_response
         else:
-            raise HTTPException(status_code=404, detail={"response" :"Token Not Found", "status": 404})
+            raise HTTPException(status_code=404 )
     else:
-        raise HTTPException(status_code=404, detail={"response" :"Token Not Found", "status": 404}) 
+        raise HTTPException(status_code=404) 
     
     
 @app.post("/register")
