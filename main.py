@@ -56,7 +56,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
     "http://localhost:3000",  
-    "*"
+    "https://ebookz.store/"
 ]
 
 client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?retryWrites=true&w=majority")
