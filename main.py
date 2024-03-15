@@ -1,5 +1,5 @@
 # import sys
-from fastapi import  FastAPI, File, UploadFile, Form, HTTPException, Depends, Cookie,Header
+from fastapi import  FastAPI, File, UploadFile, Form, HTTPException, Body, Cookie,Header
 from pymongo import MongoClient
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -13,6 +13,7 @@ import base64
 from fastapi.middleware.cors import CORSMiddleware
 import jwt
 from bson import ObjectId
+from typing import Optional, Dict, Any
 
 Port = 8000
 Domain = 'http://localhost:8000'
@@ -62,7 +63,7 @@ client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?
 db = client["Users"] 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins="http://localhost:3001", 
+    allow_origins="*", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -136,8 +137,7 @@ class Removebook(BaseModel):
     book: str
     name: str
 class AddbookData(BaseModel):
-    name: str
-    id: int
+    id: str
     
     
 @app.post("/AccountInfo/")
@@ -228,20 +228,29 @@ async def get_data():
         item["_id"] = str(item["_id"]) 
     return data[data1 - 1]
 
+
+@app.get("/sample/")
+async def get_data():
+    return "hello"
+
 @app.post("/Added_books/")
-async def get_data(data: AddbookData):
+async def get_data(data: Optional[Dict[str, Any]] = Body(None)):
+
+    iD = data.get("id")
     collection = db["Addbook"]
-    name = data.name
-    if name is None :
+    
+    if not iD:
         return {"data": "None"}
     else:
-        data2 = list(collection.find({"id": data.id}))
-        if data2 == []:
+        data2 = list(collection.find({"id": int(iD)}))
+        
+        if not data2:
             return {"data": "None"}
-        else:
-            for item in data2:
-                item["_id"] = str(item["_id"])  
-            return data2
+        
+        for item in data2:
+            item["_id"] = str(item["_id"])  
+
+        return data2
 
 
 @app.post("/create_folder/")
