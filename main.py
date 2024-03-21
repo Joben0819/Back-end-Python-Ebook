@@ -156,9 +156,9 @@ async def get_data(token: str = Header(None), id: str = Header(None)):
         raise HTTPException(status_code=404) 
     
     
-@app.get("/")
+@app.get("/hello")
 async def get_data():
-    return JSONResponse(content={"message": "greatness"}, status_code=200)
+    return JSONResponse(content={"message": "greatness value"}, status_code=200)
     
     
 @app.post("/register")
