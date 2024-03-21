@@ -1,4 +1,3 @@
-# import sys
 from fastapi import  FastAPI, File, UploadFile, Form, HTTPException, Body, Cookie,Header
 from pymongo import MongoClient
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -63,7 +62,7 @@ client = MongoClient("mongodb+srv://Joben:Anne060123@joben.a1aoz0g.mongodb.net/?
 db = client["Users"] 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
