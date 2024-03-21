@@ -232,6 +232,7 @@ async def get_data( ):
 #     return data[data1 - 1]
 
 
+#   --------------------------- Added_books -----------------------------------   #
 
 @app.post("/Added_books/")
 async def get_data(data: Optional[Dict[str, Any]] = Body(None)):
@@ -252,23 +253,7 @@ async def get_data(data: Optional[Dict[str, Any]] = Body(None)):
 
         return data2
 
-
-@app.post("/create_folder/")
-async def create_folder(folder_name: FolderInput):
-    # new_folder_path = f"./Ebooks/{folder_name.title}"
-    collection = db.get_collection("Ebooks")
-    data1 = list(collection.find({"title": folder_name.title}))
-    for item in data1:
-        item["_id"] = str(item["_id"]) 
-    # new_directory = Path(new_folder_path)
-    # new_directory.mkdir(parents=True, exist_ok=True) hello world
-
-    if data1 == []:
-        collection.insert_one({"title": folder_name.title, "image": folder_name.base64img, "id": folder_name.id,  })
-        return {"message": f"Folder '{folder_name.title}' created successfully."}
-    
-    else:
-        return {"message": f"Folder '{folder_name.title}' already exists."}
+#   --------------------------- create_text_file -----------------------------------   #
 
 @app.post("/create_text_file/")
 async def create_text_file(text_data: TextFileInput):
@@ -297,31 +282,26 @@ async def create_text_file(text_data: TextFileInput):
 @app.post("/UploadFile/")
 async def create_upload_file(file: UploadFile = File(...), filename: str = Form(...), Author1: str = Form(...), Id: str = Form(...)):
     collection = db.get_collection("Ebooks")
-    result = collection.find_one({"filename": filename})
+    result = collection.find_one({"id": Id})
     
-    if result:
+    if result == []:
         collection.insert_one({"filename": filename, "content": file.file.read(), "image": f"{Domain}/get_image/{filename}", "id": Id , "author": Author1, "reader": 0 , "rating": 0  })
-        return {"detail": "Edited the Chapter"}
+        return {"detail": "Added"}
     
     else:
-        # data2 = list(collection.find({}))
-        # for item in data2:
-        #     item["_id"] = str(item["_id"]) 
-        # setid = len(data2)
-        collection.insert_one({"filename": filename, "content": file.file.read(), "image": f"{Domain}/get_image/{filename}", "id": Id , "author": Author1, "reader": 0 , "rating": 0  })
-        return{"detail": "Added"}
+        return{"detail": "Exist"}
     
-@app.post('/YourBook')
-async def writer(data: Stories):
-    collection = db['Writer']
-    data1 = collection.find_one({"id": data.id})
+# @app.post('/YourBook')
+# async def writer(data: Stories):
+#     collection = db['Writer']
+#     data1 = collection.find_one({"id": data.id})
     
-    if data1:
-        collection.update_one(
-            {"id": data.id},
-            {"$push": {"YourBook":{"bookshelf": data.book, "reader": 0, "rating": 0}}})
-    else:    
-        return{"detail": "Nodata"}  
+#     if data1:
+#         collection.update_one(
+#             {"id": data.id},
+#             {"$push": {"YourBook":{"bookshelf": data.book, "reader": 0, "rating": 0}}})
+#     else:    
+#         return{"detail": "Nodata"}  
 
 # def get_file_content(file_id: str):
 #     collection = db.get_collection("Ebooks")
@@ -363,7 +343,7 @@ async def get_image(file_id: str):
     
 @app.post("/add_book/")
 async def read_root(data: Addbook):
-    collection = db.get_collection("Addbook")
+    collection = db.get_collection("Users")
     existing_user = collection.find_one({"id": data.id})
     existing_data = list(collection.find({"Books.book": data.book, "id": data.id}))   
     for item in existing_data:
