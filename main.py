@@ -158,7 +158,7 @@ async def get_data(token: str = Header(None), id: str = Header(None)):
     
 @app.get("/")
 async def get_data():
-    return JSONResponse(content={"message": "great"}, status_code=200)
+    return JSONResponse(content={"message": "greatness"}, status_code=200)
     
     
 @app.post("/register")
