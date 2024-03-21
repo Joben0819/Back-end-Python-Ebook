@@ -156,9 +156,6 @@ async def get_data(token: str = Header(None), id: str = Header(None)):
         raise HTTPException(status_code=404) 
     
     
-@app.get("/hello")
-async def get_data():
-    return JSONResponse(content={"message": "greatness value"}, status_code=200)
     
     
 @app.post("/register")
@@ -210,41 +207,40 @@ async def create_item( data: Login,  my_token: str = Cookie(None), ticket: str =
         user_response = {key: value for key, value in user_Data.items() if key != "Key" and key != "password" }
         # response = JSONResponse(content=user_response, status_code=200)
         return user_response
+    
+    
 @app.get("/get_data/")
 async def get_data( ):
     collection = db["Ebooks"]
     data = list(collection.find({}))
     
     if data == []: 
-        return {"detail":"wala"}
+        return {"detail":"Empty"}
     for item in data:
         item["_id"] = str(item["_id"])
         item.pop("content", None)
 
     return JSONResponse(content=data)
 
-@app.get("/get_user_data/")
-async def get_data():
-    collection = db["Users"]
-    data = list(collection.find({}))
-    data1 = len(data)
-    for item in data:
-        item["_id"] = str(item["_id"]) 
-    return data[data1 - 1]
+# @app.get("/get_user_data/")
+# async def get_data():
+#     collection = db["Users"]
+#     data = list(collection.find({}))
+#     data1 = len(data)
+#     for item in data:
+#         item["_id"] = str(item["_id"]) 
+#     return data[data1 - 1]
 
 
-@app.get("/sample/")
-async def get_data():
-    return "hello"
 
 @app.post("/Added_books/")
 async def get_data(data: Optional[Dict[str, Any]] = Body(None)):
 
     iD = data.get("id")
-    collection = db["Addbook"]
+    collection = db["Reader"]
     
     if not iD:
-        return {"data": "None"}
+        return {"data": "Empty"}
     else:
         data2 = list(collection.find({"id": int(iD)}))
         
