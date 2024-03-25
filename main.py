@@ -118,7 +118,7 @@ class AddFavorite(BaseModel):
     book: str
     name: str
     
-class AddPage(BaseModel):
+class AddPageNumber(BaseModel):
     id: int
     book: str
     idx: int
@@ -278,7 +278,7 @@ async def create_upload_file( filename: str = Form(...), Author1: str = Form(...
             item["_id"] = str(item["_id"]) 
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
-            collection_book.insert_one({"filename": filename, "content": "", "image": f"{Domain}/get_image/{filename}", "id": Id , "_id": Unique , "author": Author1, "reader": 0 , "rating": 0  })
+            collection_book.insert_one({"filename": filename, "image": f"{Domain}/get_image/{filename}", "id": Id , "_id": Unique , "author": Author1, "reader": 0 , "rating": 0  })
             return {"detail": "Added Book"}
         else:
             raise HTTPException(status_code=404 )
@@ -362,8 +362,6 @@ async def create_text_file(text_data: DeleteFileInput,  token: str = Header(None
         return {"detail": "No token and Id","data": False} 
     
     
-
-    
      #   --------------------------- get_user_data -----------------------------------   #   
 
 
@@ -384,8 +382,10 @@ async def get_data():
 
 @app.post("/add_book/")
 async def read_root(data: Addbook, token: str = Header(None), id: str = Header(None)):
-    collection = db.get_collection("Reader")
-    existing_user = collection.find_one({"_id": data.id})
+    collection = db.get_collection("Readers")
+    existing_user = list(collection.find({"id": data.id}))
+    for item in existing_user:
+        item["_id"] = str(item["_id"]) 
     collection_user = db['Users']
     if id and token :
         data2 = list(collection_user.find({"id": int(id) }))
@@ -394,14 +394,14 @@ async def read_root(data: Addbook, token: str = Header(None), id: str = Header(N
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user == []:
-                # collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : data.idx , "favorite": False , "reading" : True}]})
-                return{"detail": "Onread"}  
+                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : data.idx , "favorite": False , "reading" : True}]})
+                return{"detail": "Added"}  
             else:
                 collection.update_one(
                         {"id": data.id, "Books.book": data.book},
                         {"$push":{"Books": {"book": data.book , "page" : 0 , "favorite": False, "reading" : True }}}
                 )    
-                return{"detail": "Added"}  
+                return{"detail": "Read"}  
         else:
             raise HTTPException(status_code=404 )
     else:
@@ -412,8 +412,10 @@ async def read_root(data: Addbook, token: str = Header(None), id: str = Header(N
     
 @app.post("/add_favorite/")
 async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Header(None)):
-    collection = db.get_collection("Reader")
-    existing_user = collection.find_one({"_id": data.id})
+    collection =db['Readers']
+    existing_user = list(collection.find({"id": data.id}))
+    for item in existing_user:
+        item["_id"] = str(item["_id"]) 
     collection_user = db['Users']
     if id and token :
         data2 = list(collection_user.find({"id": int(id) }))
@@ -422,7 +424,7 @@ async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Hea
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user == []:
-                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : 0 , "favorite": False , "reading" : True}]})
+                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : 0 , "favorite": True , "reading" : True}]})
                 return{"detail": False}  
             else:
                 collection.update_one(
@@ -443,9 +445,11 @@ async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Hea
     
     
 @app.post("/add_pageNumber/")
-async def read_root(data: AddPage,token: str = Header(None), id: str = Header(None)):
-    collection = db.get_collection("Reader")
-    existing_user = collection.find_one({"_id": data.id})
+async def read_root(data: AddPageNumber,token: str = Header(None), id: str = Header(None)):
+    collection = db['Readers']
+    existing_user = list(collection.find({"id": data.id}))
+    for item in existing_user:
+        item["_id"] = str(item["_id"])  
     collection_user = db['Users']
     if id and token :
         data2 = list(collection_user.find({"id": int(id) }))
@@ -474,7 +478,7 @@ async def read_root(data: AddPage,token: str = Header(None), id: str = Header(No
         
 @app.post("/Added_books/")
 async def get_data(data: Optional[Dict[str, Any]] = Body(None),token: str = Header(None), id: str = Header(None)):
-    collection = db.get_collection("Reader")
+    collection = db['Readers']
     collection_user = db['Users']
     iD = data.get("id")
     if id and token :
@@ -487,15 +491,11 @@ async def get_data(data: Optional[Dict[str, Any]] = Body(None),token: str = Head
             if not iD:
                 return {"data": "Empty"}
             else:
-                data3 = list(collection.find({"_id": iD}))
-                
-                if not data2:
-                    return {"data": "None"}
-                
-                for item in data2:
+                data3 = list(collection.find({"id": int(iD)}))
+                for item in data3:
                     item["_id"] = str(item["_id"])  
-
-            return data3
+                    
+                return data3
     else:
         return {"detail": "No token and Id", "data": False} 
 
