@@ -54,7 +54,8 @@ app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
-    "http://localhost:3000",  
+    "http://localhost:3000", 
+        "http://localhost:3001",  
     "https://ebookz.store/"
 ]
 
@@ -83,7 +84,7 @@ class TextFileInput(BaseModel):
     file_name: str  
     text_content: str  
     Book: str  
-    Unique: str
+    Unique: int
 class DeleteFileInput(BaseModel):
     file_name: str  
     Book: str  
@@ -96,11 +97,11 @@ class Process(BaseModel):
     id: int
     book: str
     
-class Onrating(BaseModel):
+class Read_file(BaseModel):
     id: int
     book: str
-    username: str
-    reader:int
+    # username: str
+    idx:int
 
 class rates(BaseModel):
     id: int
@@ -109,6 +110,7 @@ class rates(BaseModel):
     
 class Addbook(BaseModel):
     id: int
+    book_id: int
     book: str
     name: str
     idx: int
@@ -156,14 +158,47 @@ class AddbookData(BaseModel):
 async def get_data( ):
     collection = db["Ebooks"]
     data = list(collection.find({}))
-    
+    length = len(data)
     if data == []: 
-        return {"detail":"Empty"}
+        return {"data":"Empty"}
     for item in data:
         item["_id"] = str(item["_id"])
-        item.pop("content", None)
+        # item.pop("content", None)
 
-    return JSONResponse(content=data)
+    return{"data": data, "length": length}
+
+
+
+    
+     #   --------------------------- get_user_data -----------------------------------   #   
+
+
+    
+@app.get("/get_user_data/")
+async def get_data():
+    collection = db["Users"]
+    data = list(collection.find({}))
+    length = len(data)
+    data2 = 111 if length > 1 else 0
+    for item in data:
+        item["_id"] = str(item["_id"]) 
+    return {"data": data, "length": length}
+
+
+
+     #   --------------------------- get_readers -----------------------------------   #   
+
+
+    
+@app.get("/get_readers/")
+async def get_data():
+    collection = db["Readers"]
+    data = list(collection.find({}))
+    length = len(data)
+    data2 = 111 if length > 1 else 0
+    for item in data:
+        item["_id"] = str(item["_id"]) 
+    return {"data": data, "length": length}
     
     
         #   --------------------------- Register Account -----------------------------------   #
@@ -230,16 +265,27 @@ async def create_item( data: Login,  my_token: str = Cookie(None), ticket: str =
 @app.post("/AccountInfo/")
 async def get_data(token: str = Header(None), id: str = Header(None)):
     collection = db["Users"]
+    collection_ebook = db["Readers"]
     if id and token :
         data2 = list(collection.find({"id": int(id) }))
         for item in data2:
             item["_id"] = str(item["_id"]) 
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
-        if decode_Ticket["key"] != "Invalid":
-            user_response = {key: value for key, value in data2[0].items() if key != "Key" and key != "password" and key != "token" }
-            return user_response
+        existing_read = collection_ebook.find({"id": int(id)})
+        for item in existing_read:
+            item["_id"] = str(item["_id"]) 
+        if  decode_Ticket.get("key") != "Invalid":
+            if existing_read:
+                user_response = {key: value for key, value in data2[0].items() if key != "Key" and key != "password" and key != "token" }
+                if existing_read is None:
+                    print("No documents found with id:", id)
+                else:
+                    print(" documents found with id:", id)
+                return {"data": user_response, "reads": item, "status": 200}
+            else:
+                return {"data": [], "reads": [], "status": 200}
         else:
-            raise HTTPException(status_code=404 )
+            return {"data": [], "reads": [], "status": 200}
     else:
         raise HTTPException(status_code=404) 
     
@@ -291,11 +337,11 @@ async def create_upload_file( filename: str = Form(...), Author1: str = Form(...
 @app.post("/create_text_file/")
 async def create_text_file(text_data: TextFileInput,  token: str = Header(None), id: str = Header(None)):
     collection_user = db['Users']
-    collection = db.get_collection("Ebooks")
+    collection = db["Ebooks"]
     file_name = text_data.file_name
     text_content = text_data.text_content
     Book_store = text_data.Book
-    existing_user = collection.find_one({"_id": text_data.Unique})
+    existing_user = collection.find_one({"id": str(text_data.Unique)})
     if id and token :
         data2 = list(collection_user.find({"id": int(id) }))
         for item in data2:
@@ -303,21 +349,22 @@ async def create_text_file(text_data: TextFileInput,  token: str = Header(None),
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user:       
-                chapters = existing_user.get("Chapter", [])
-                for chapter in chapters:
-                    title = chapter.get("Title")
-                    if title:
-                        collection.update_one(
-                            {"filename": Book_store, "Chapter.Title": file_name },
-                            {"$set": {"Chapter.$.Title": file_name , "Chapter.$.content": text_content  }}
-                        )            
-                        return{"status": "Edited"}
-                    else:
-                        collection.update_one(
-                            {"filename": Book_store, "_id": text_data.Unique },
-                            {"$push":{"Chapter": {"Title": file_name, "content" : text_content }}}
-                        )            
-                        return{"status": "Added"}
+                # chapters = existing_user.get("Chapter", [])
+                ebook = next((book for book in existing_user['Chapter'] if book['Title'] == file_name), None)
+                # for chapter in chapters:
+                #     title = chapter.get("Title")
+                if ebook.get("Title") == file_name:
+                    collection.update_one(
+                        {"filename": Book_store, "Chapter.Title": file_name },
+                        {"$set": {"Chapter.$.Title": file_name , "Chapter.$.content": text_content  }}
+                    )            
+                    return{"status": 200, "detail": "Edited", "data": True}
+                else:
+                    collection.update_one(
+                        {"filename": Book_store, "id": str(text_data.Unique) },
+                        {"$push":{"Chapter": {"Title": file_name, "content" : text_content }}}
+                    )            
+                    return{"status": 200, "detail": "Added", "data": True}
             else:
                 return { "status": False, "Message": "Wrong Data"}
         else:
@@ -360,30 +407,19 @@ async def create_text_file(text_data: DeleteFileInput,  token: str = Header(None
             raise HTTPException(status_code=404 )
     else:
         return {"detail": "No token and Id","data": False} 
-    
-    
-     #   --------------------------- get_user_data -----------------------------------   #   
-
-
-    
-@app.get("/get_user_data/")
-async def get_data():
-    collection = db["Users"]
-    data = list(collection.find({}))
-    data1 = len(data)
-    data2 = 111 if data1 > 1 else 0
-    for item in data:
-        item["_id"] = str(item["_id"]) 
-    return {"data": data, "length": data1}
 
 
      #   --------------------------- Add To Read -----------------------------------   #   
-
-
+     
+     
+current_value = 0
 @app.post("/add_book/")
 async def read_root(data: Addbook, token: str = Header(None), id: str = Header(None)):
-    collection = db.get_collection("Readers")
-    existing_user = list(collection.find({"id": data.id}))
+    global current_value
+    collection = db["Readers"]
+    collection_data = db["Ebooks"]
+    # existing_data = collection_data.find_one({"id": str(data.id),"filename": data.book})
+    existing_user = list(collection.find({"id": data.id, "name": data.name}))
     for item in existing_user:
         item["_id"] = str(item["_id"]) 
     collection_user = db['Users']
@@ -394,26 +430,44 @@ async def read_root(data: Addbook, token: str = Header(None), id: str = Header(N
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user == []:
-                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : data.idx , "favorite": False , "reading" : True}]})
+                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : 0,"favorite": False  , "reading" : True}]})
+                current_value +=  1
+                collection_data.update_one(
+                {"id": str(data.book_id), "filename": data.book},
+                {"$set":{"reader": current_value }}
+
+                )
                 return{"detail": "Added"}  
             else:
-                collection.update_one(
-                        {"id": data.id, "Books.book": data.book},
-                        {"$push":{"Books": {"book": data.book , "page" : 0 , "favorite": False, "reading" : True }}}
-                )    
-                return{"detail": "Read"}  
+                existing_read = collection.find_one({"id": data.id, "Books.book": data.book})
+                if existing_read:
+                    ebook = next((book for book in existing_read['Books'] if book['book'] == data.book), None)
+                    if ebook.get("reading") == False:
+                        collection.update_one(
+                            {"id": data.id, "Books.book": "Dracula"},
+                            {"$set": {"Books.$.reading": True}},
+                        )
+                        current_value +=  1
+                        collection_data.update_one(
+                        {"id": str(data.book_id), "filename": data.book},
+                        {"$set":{"reader": current_value }}
+                        ) 
+                        return{"detail":"reading to true", "data": True}  
+                    else:
+                        return{"detail": "Already Added ","length": len(existing_user[0].get("Books", []))}
+                        
         else:
             raise HTTPException(status_code=404 )
     else:
         return {"detail": "No token and Id","data": False} 
     
     #   --------------------------- Add To Favorite -----------------------------------   #   
-    
-    
+
+
 @app.post("/add_favorite/")
 async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Header(None)):
     collection =db['Readers']
-    existing_user = list(collection.find({"id": data.id}))
+    existing_user = list(collection.find({"id": data.id, "name": data.name}))
     for item in existing_user:
         item["_id"] = str(item["_id"]) 
     collection_user = db['Users']
@@ -424,20 +478,62 @@ async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Hea
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user == []:
-                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book , "page" : 0 , "favorite": True , "reading" : True}]})
-                return{"detail": False}  
+                collection.insert_one({"id": data.id, "name": data.name,"Books": [{"book": data.book, "reading": False  , "favorite": True }]})
+                return{"details": "add to be favorite", "data": True}  
             else:
-                collection.update_one(
-                        {"id": data.id, "Books.book": data.book},
-                        {"$set":{"Books.$.favorite": True }}
-                )    
-                return{"detail": True}  
+                existing_book = list(collection.find({"id": data.id, "Books.book": data.book}))
+                for item in existing_book:
+                    item["_id"] = str(item["_id"]) 
+                if existing_book:
+                    collection.update_one(
+                            {"id": data.id, "Books.book": data.book},
+                            {"$set":{"Books.$.favorite": True }}
+                    )
+                    return{"detail": "set as favorite", "data": False}
+                else:
+                    collection.update_one(
+                        {"id": data.id,},
+                        {"$push":{"Books":{"book": data.book  , "favorite": True, "reading": False } }}
+                    ) 
+                    return{"detail": "add as favorite", "data": False}
         else:
             
             raise HTTPException(status_code=404 )
     else:
         return {"detail": "No token and Id","data": False} 
     
+    
+    
+        #   --------------------------- Add To Unfavorite -----------------------------------   #   
+    
+    
+@app.post("/add_Unfavorite/")
+async def read_root(data: AddFavorite,  token: str = Header(None), id: str = Header(None)):
+    collection = db['Readers']
+    collection_user = db['Users']
+    if id and token :
+        data2 = list(collection_user.find({"id": int(id) }))
+        for item in data2:
+            item["_id"] = str(item["_id"]) 
+        decode_Ticket = decode_token(str(token), data2[0]["Key"])
+        if decode_Ticket:
+
+            existing_book = list(collection.find({"id": data.id, "Books.book": data.book}))
+            for item in existing_book:
+                item["_id"] = str(item["_id"]) 
+            if existing_book:
+                collection.update_one(
+                        {"id": data.id, "Books.book": data.book},
+                        {"$set":{"Books.$.favorite": False }}
+                )
+                return{"detail": "set as unfavorite", "data": True}
+            else:
+                return{"detail": "Already Remove", "data": False}
+        else:
+            
+            raise HTTPException(status_code=404 )
+    else:
+        return {"detail": "No token and Id","data": False} 
       
         
         
@@ -458,13 +554,13 @@ async def read_root(data: AddPageNumber,token: str = Header(None), id: str = Hea
         decode_Ticket = decode_token(str(token), data2[0]["Key"])
         if decode_Ticket:
             if existing_user == []:
-                return{"detail": False}  
+                return{"detail": "No data", "data": False}  
             else:
                 collection.update_one(
                         {"id": data.id, "Books.book": data.book},
                         {"$set":{"Books.$.page": data.idx }}
                 )    
-                return{"detail": True}  
+                return{"detail":"Added", "data": True}  
         else:
             
             raise HTTPException(status_code=404 )
@@ -512,113 +608,38 @@ async def get_image(file_id: str):
     else:
         raise HTTPException(status_code=404, detail="Image not found")
 
-        #   --------------------------- Readers -----------------------------------   #  
-      
-@app.post("/Readers")
-async def read_root(data: Onrating):
+        #   --------------------------- Readers_file -----------------------------------   #  
+        
+        
+
+@app.post("/Readers_file")
+async def read_root(data: Read_file):
     # collection2 = db.get_collection("Writer")
     collection_read = db.get_collection("Readers")
     collection3 = db.get_collection("Ebooks")
-    existing_data1 = collection3.find_one({"_id": data.reader,"filename": data.book})
-    if existing_data1:
-                collection3.update_one(
-                {"id": data.id, "filename": data.book},
-                {"$set":{"reader":  1 }}
-
-                )
-    #     return{"detail": "Already Added"}
-    # else:
-        # existing_data2 = list(collection2.find({"username": data.username,"id": data.id}))
-        # for item in existing_data2:
-        #     item["_id"] = str(item["_id"])  
-        
-        # if existing_data2 == []:
-        #     return {"detail": "null"}
-        # else:
-        #     documents = []    
-        #     bookshelf = existing_data2[0].get("YourBook", [])
-        #     for book in bookshelf:
-        #         if "bookshelf" in book and book["bookshelf"] == data.book:
-        #             documents.append(book)
-        #     if documents: 
-        #         collection2.update_one(
-        #         {"id": data.id, "YourBook.bookshelf": data.book},
-        #         {"$set":{"YourBook.$.reader": documents[0].get("reader") + 1 }}
-        #         )
-        #         collection3.update_one(
-        #         {"id": str(data.id), "filename": data.book},
-        #         {"$set":{"reader": documents[0].get("reader") + 1  }}
-        #         )
-        #         return {"detail": "Success"}
-        #     else:
-        #         return{"detail": "Null"}  
-            
+    existing_data = collection3.find_one({"id": str(data.id),"filename": data.book})
+    length = len(existing_data.get("Chapter")) 
+    if length - 1 >= data.idx:
+        if existing_data:
+            return{"Chapters": existing_data.get("Chapter")[data.idx], "length": length ,"data": True}
+        else:
+            return{"Chapter": [], "length": length, "data":False}
+    else:
+        return{"Chapter": [], "length": length ,"data":False}
             
 
-
-@app.post("/Delete")
-async def read_root(data: rates):
-    collection1 = db.get_collection("Writer")
-    collection2 = db.get_collection("Ebooks")
-    existing_data2 = collection1.find_one({"id": data.id,"username": data.name})
-
-    if existing_data2:
-        # collection1.delete_many(dict(data)) 
-        collection1.delete_one({"YourBook.bookshelf": data.book})
-        return{"detail":[{"id": data.id, "name": data.name}]}
-    else:
-        return{"detail": "No data"}     
+# @app.post('/author')
+# async def author(data: Author):
+#     collection = db['Writer']
+#     data1 = list(collection.find({"username": data.username}))
     
+#     for item in data1:
+#         item["_id"] = str(item["_id"])  
     
-    
-@app.post("/remove_book/")
-async def read_root(data: Removebook):
-    collection = db.get_collection("Addbook")
-    existing_user = collection.find_one({"id": data.id})
-    if existing_user is None:
-        raise JSONResponse(status_code=404, detail="User not found")
-    
-    elif existing_user:
-        existing_datas = list(collection.find({"Books.book": data.book, "id": data.id,"Books.status": 1 }))   
-        if existing_datas:
-            collection.update_one(
-            {"id": data.id, "Books.book": data.book},
-            {"$set": {"Books.$.status": 2  }}
-            )
-            return{"detail": "Added"} 
-    return{"detail" : "Removed"}
-
-@app.post("/mark_as_done/")
-async def read_root(data: Process):
-    id = data.id
-    book = data.book
-    collection = db.get_collection("Addbook")
-    # existing_data = collection.find_one({"Books.book": book})
-    existing_book = list(collection.find({"Books.book": data.book, "id": data.id}))   
-    for item in existing_book:
-        item["_id"] = str(item["_id"])  
-        
-    if existing_book:
-        collection.update_one(
-            {"id": id, "Books.book": book},
-            {"$set": {"Books.$.Done": True, "Books.$.inread": 0 , "Books.$.onread": False}}
-        )
-        return {"detail": "Done"}
-    
-
-
-@app.post('/author')
-async def author(data: Author):
-    collection = db['Writer']
-    data1 = list(collection.find({"username": data.username}))
-    
-    for item in data1:
-        item["_id"] = str(item["_id"])  
-    
-    if data1 != []:
-        return data1[0]
-    else:
-        return {"detail": "not existed"}      
+#     if data1 != []:
+#         return data1[0]
+#     else:
+#         return {"detail": "not existed"}      
             
 # @app.post("/rate")
 # async def read_root(data: rates):
