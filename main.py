@@ -260,6 +260,26 @@ async def create_item( data: Login,  my_token: str = Cookie(None), ticket: str =
         return user_response
     
     
+            #   --------------------------- Logout Account -----------------------------------   #
+        
+  
+@app.post("/logout")
+async def create_item(  id: str = Header(None)):
+    collection = db["Users"]
+    data2 = list(collection.find({"id": int(id)}))
+    for item in data2:
+        item["_id"] = str(item["_id"])  
+    if not data2 :
+        return JSONResponse(status_code=200,content={"detail": "Not existed"})
+    else:
+        random_Number = str(random.randint(1,1000))
+        token = create_token({"key": item.get("name")}, random_Number, expires_delta=3600)
+        collection.update_one({"name": item.get("name")},
+        {"$set":{"token": token, "Key": random_Number }})
+        # response = JSONResponse(content=user_response, status_code=200)
+        return {"detail": "success", "data": "true", "status": 200}
+    
+    
         #   --------------------------- User Account -----------------------------------   #
     
 @app.post("/AccountInfo/")
